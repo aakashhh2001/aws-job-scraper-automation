@@ -24,29 +24,32 @@ MY_SKILLS = [
     "sonarqube", "prometheus", "grafana", "linux", "mysql", "subnetting", "networking"
 ]
 
-# Strict filters: eliminates listings demanding mid-to-senior levels (5+ years)
+# STRICT FILTER: Rejects anything explicitly demanding 2, 3, 4, 5+ years to protect against false entries
 REJECT_EXP_PATTERN = re.compile(
-    r'(?:\b(?:5|6|7|8|9|10|11|12)\+?\s*(?:-\s*(?:\d+))?\s*(?:years?|yrs?)\b|\bminimum\s*(?:5|6|7|8|9|10)\b)', 
+    r'(?:\b(?:2|3|4|5|6|7|8|9|10)\+?\s*(?:-\s*(?:\d+))?\s*(?:years?|yrs?)\b|\bminimum\s*(?:2|3|4|5)\b)', 
     re.IGNORECASE
 )
 
-# Accepts specific fresher timelines (0 to 4 years)
+# Explicitly accepts true fresher indicators
 ACCEPT_EXP_PATTERN = re.compile(
-    r'\b(?:0|1|2|3|4|6\s*months)\s*(?:to|-)?\s*(?:1|2|3|4)?\s*(?:years?|yrs?)\b|\b(?:fresher|entry[- ]level|graduate)\b', 
+    r'\b(?:0|1|6\s*months)\s*(?:to|-)?\s*(?:1)?\s*(?:years?|yrs?)\b|\b(?:fresher|entry[- ]level|graduate|no\s*experience\s*required)\b', 
     re.IGNORECASE
 )
 
 def evaluate_job(title, description):
     desc_lower = description.lower()
     
+    # 1. Strict Experience Gatekeeping
     if REJECT_EXP_PATTERN.search(desc_lower):
+        # If it contains a mid-level year requirement, drop it unless it explicitly mentions it's open to freshers
         if not ACCEPT_EXP_PATTERN.search(desc_lower):
             return False, 0
             
+    # 2. Skill-Matching Analysis
     matched_skills = [skill for skill in MY_SKILLS if skill in desc_lower]
     match_percentage = (len(matched_skills) / len(MY_SKILLS)) * 100
     
-    # Valid matching logic if it contains elements of your technology ecosystem
+    # Needs to hit a baseline of at least 4 tech keywords from your stack
     is_highly_relevant = len(matched_skills) >= 4
     
     return is_highly_relevant, round(match_percentage, 2)
@@ -55,13 +58,13 @@ def fetch_jobs_from_api(api_key):
     all_jobs = []
     seen_job_ids = set()
     
-    # We rotate through the first few titles to stay safely within the free 100 monthly queries limit
-    # You can change the slice daily or run specific subsets
-    for title in JOB_TITLES[:4]:  
+    # Query a batch of titles daily.
+    for title in JOB_TITLES[:5]:  
         url = "https://serpapi.com/search.json"
         params = {
             "engine": "google_jobs",
             "q": f"{title} jobs India",
+            "chips": "date:today",  # <--- CRITICAL FIX: Restricts results strictly to the last 24 hours
             "api_key": api_key,
             "hl": "en"
         }
@@ -94,7 +97,6 @@ def update_google_sheet(qualified_jobs):
     sheet = client.open("Job Tracker").worksheet("Jobs")
     today = datetime.now().strftime("%Y-%m-%d")
     
-    # Extract existing links to avoid duplicate entries
     existing_links = sheet.col_values(6)
     
     added_count = 0
@@ -120,7 +122,7 @@ def main():
         print("Missing SERPAPI_KEY environment variable.")
         return
 
-    print("Fetching job postings...")
+    print("Fetching brand new job postings (past 24h)...")
     raw_jobs = fetch_jobs_from_api(SERPAPI_KEY)
     
     qualified_jobs = []
@@ -129,7 +131,8 @@ def main():
         company = job.get("company_name", "")
         description = job.get("description", "")
         location = job.get("location", "Not Specified")
-        # Check for direct apply options first, fallback to related links if empty
+        
+        # Link extraction fix handling both schemas safely
         apply_options = job.get("apply_options", [])
         if apply_options:
             apply_link = apply_options[0].get("link", "No link")
