@@ -26,13 +26,13 @@ MY_SKILLS = [
 
 # STRICT FILTER: Rejects anything explicitly demanding 2, 3, 4, 5+ years to protect against false entries
 REJECT_EXP_PATTERN = re.compile(
-    r'(?:\b(?:2|3|4|5|6|7|8|9|10)\+?\s*(?:-\s*(?:\d+))?\s*(?:years?|yrs?)\b|\bminimum\s*(?:2|3|4|5)\b)', 
+    r'(?:\b(?:3|4|5|6|7|8|9|10)\+?\s*(?:-\s*(?:\d+))?\s*(?:years?|yrs?)\b|\bminimum\s*(?:2|3|4|5)\b)', 
     re.IGNORECASE
 )
 
 # Explicitly accepts true fresher indicators
 ACCEPT_EXP_PATTERN = re.compile(
-    r'\b(?:0|1|6\s*months)\s*(?:to|-)?\s*(?:1)?\s*(?:years?|yrs?)\b|\b(?:fresher|entry[- ]level|graduate|no\s*experience\s*required)\b', 
+    r'\b(?:0|1|2|6\s*months)\s*(?:to|-)?\s*(?:1)?\s*(?:years?|yrs?)\b|\b(?:fresher|entry[- ]level|graduate|no\s*experience\s*required)\b', 
     re.IGNORECASE
 )
 
@@ -64,7 +64,7 @@ def fetch_jobs_from_api(api_key):
         params = {
             "engine": "google_jobs",
             "q": f"{title} jobs India",
-            "chips": "date:today",  # <--- CRITICAL FIX: Restricts results strictly to the last 24 hours
+            "chips": "date:week",  # <--- CRITICAL FIX: Restricts results strictly to the last 24 hours
             "api_key": api_key,
             "hl": "en"
         }
