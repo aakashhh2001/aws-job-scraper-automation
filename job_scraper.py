@@ -129,7 +129,12 @@ def main():
         company = job.get("company_name", "")
         description = job.get("description", "")
         location = job.get("location", "Not Specified")
-        apply_link = job.get("related_links", [{}])[0].get("link", "No link")
+        # Check for direct apply options first, fallback to related links if empty
+        apply_options = job.get("apply_options", [])
+        if apply_options:
+            apply_link = apply_options[0].get("link", "No link")
+        else:
+            apply_link = job.get("related_links", [{}])[0].get("link", "No link")
         
         title_lower = title.lower()
         has_valid_title = any(kw.lower() in title_lower for kw in KEYWORD_RULES) or any(t.lower() in title_lower for t in JOB_TITLES)
