@@ -24,7 +24,7 @@ MY_SKILLS = [
 ]
 
 # CHANGE THIS NUMBER if your sheet stays empty. 6 is very strict for a fresher JD.
-MINIMUM_SKILL_MATCH = 6
+MINIMUM_SKILL_MATCH = 0
 
 # Strict filter: Rejects anything explicitly demanding 2, 3, 4, 5+ years
 REJECT_EXP_PATTERN = re.compile(
@@ -66,7 +66,7 @@ def fetch_jobs_from_api(api_key):
             "engine": "google_jobs",
             "q": query,
             # We are keeping the 1 week limit to ensure fresh postings
-            "chips": "date:week",  
+            "chips": "date:month",  
             "api_key": api_key,
             "hl": "en"
         }
