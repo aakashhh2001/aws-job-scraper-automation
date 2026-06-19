@@ -6,15 +6,14 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
-JOB_TITLES = [
-    "Cloud Support Engineer", "AWS Cloud Support Associate", "Cloud Infrastructure Support Engineer",
-    "L1/L2 AWS Cloud Operations Support", "Cloud Operations Associate", "Application Support Engineer",
-    "IT Operations Analyst", "Cloud Operations Analyst", "Platform Support Engineer", "Junior Cloud Engineer",
-    "Junior Infrastructure Engineer", "Junior Cloud Infrastructure Engineer", "Systems Administrator (Junior)",
-    "Linux Support Engineer", "DevOps Engineer", "NOC Engineer", "Monitoring Engineer", "AWS Cloud"
+# Replaced specific job titles with broad technical search queries
+BROAD_SEARCH_QUERIES = [
+    "AWS fresher jobs India", 
+    "Cloud entry level jobs India", 
+    "DevOps entry level jobs India",
+    "DevOps fresher jobs India",
+    "NOC entry level jobs India"
 ]
-
-KEYWORD_RULES = ["AWS", "Cloud", "DevOps", "Monitoring"]
 
 MY_SKILLS = [
     "aws", "ec2", "s3", "vpc", "lambda", "cloudformation", "route 53", "eks", "rds", "alb", "dms", "ses", 
@@ -24,7 +23,10 @@ MY_SKILLS = [
     "sonarqube", "prometheus", "grafana", "linux", "mysql", "subnetting", "networking"
 ]
 
-# STRICT FILTER: Rejects anything explicitly demanding 2, 3, 4, 5+ years to protect against false entries
+# CHANGE THIS NUMBER if your sheet stays empty. 6 is very strict for a fresher JD.
+MINIMUM_SKILL_MATCH = 6
+
+# Strict filter: Rejects anything explicitly demanding 2, 3, 4, 5+ years
 REJECT_EXP_PATTERN = re.compile(
     r'(?:\b(?:3|4|5|6|7|8|9|10)\+?\s*(?:-\s*(?:\d+))?\s*(?:years?|yrs?)\b|\bminimum\s*(?:2|3|4|5)\b)', 
     re.IGNORECASE
@@ -36,21 +38,20 @@ ACCEPT_EXP_PATTERN = re.compile(
     re.IGNORECASE
 )
 
-def evaluate_job(title, description):
+def evaluate_job(description):
     desc_lower = description.lower()
     
     # 1. Strict Experience Gatekeeping
     if REJECT_EXP_PATTERN.search(desc_lower):
-        # If it contains a mid-level year requirement, drop it unless it explicitly mentions it's open to freshers
         if not ACCEPT_EXP_PATTERN.search(desc_lower):
             return False, 0
             
-    # 2. Skill-Matching Analysis
+    # 2. Heavy Skill-Matching Analysis
     matched_skills = [skill for skill in MY_SKILLS if skill in desc_lower]
     match_percentage = (len(matched_skills) / len(MY_SKILLS)) * 100
     
-    # Needs to hit a baseline of at least 4 tech keywords from your stack
-    is_highly_relevant = len(matched_skills) >= 4
+    # Needs to hit your new threshold of 8 specific keywords
+    is_highly_relevant = len(matched_skills) >= MINIMUM_SKILL_MATCH
     
     return is_highly_relevant, round(match_percentage, 2)
 
@@ -58,13 +59,14 @@ def fetch_jobs_from_api(api_key):
     all_jobs = []
     seen_job_ids = set()
     
-    # Query a batch of titles daily.
-    for title in JOB_TITLES[:5]:  
+    # Loop through the new broad technical queries
+    for query in BROAD_SEARCH_QUERIES:  
         url = "https://serpapi.com/search.json"
         params = {
             "engine": "google_jobs",
-            "q": f"{title} jobs India",
-            "chips": "date:week",  # <--- CRITICAL FIX: Restricts results strictly to the last 24 hours
+            "q": query,
+            # We are keeping the 1 week limit to ensure fresh postings
+            "chips": "date:week",  
             "api_key": api_key,
             "hl": "en"
         }
@@ -80,7 +82,7 @@ def fetch_jobs_from_api(api_key):
                     seen_job_ids.add(job_id)
                     all_jobs.append(job)
         except Exception as e:
-            print(f"Error fetching {title}: {e}")
+            print(f"Error fetching {query}: {e}")
             
     return all_jobs
 
@@ -122,7 +124,7 @@ def main():
         print("Missing SERPAPI_KEY environment variable.")
         return
 
-    print("Fetching brand new job postings (past 24h)...")
+    print("Fetching broad tech job postings (past 24h)...")
     raw_jobs = fetch_jobs_from_api(SERPAPI_KEY)
     
     qualified_jobs = []
@@ -132,20 +134,14 @@ def main():
         description = job.get("description", "")
         location = job.get("location", "Not Specified")
         
-        # Link extraction fix handling both schemas safely
         apply_options = job.get("apply_options", [])
         if apply_options:
             apply_link = apply_options[0].get("link", "No link")
         else:
             apply_link = job.get("related_links", [{}])[0].get("link", "No link")
         
-        title_lower = title.lower()
-        has_valid_title = any(kw.lower() in title_lower for kw in KEYWORD_RULES) or any(t.lower() in title_lower for t in JOB_TITLES)
-        
-        if not has_valid_title:
-            continue
-            
-        is_match, match_score = evaluate_job(title, description)
+        # We removed the Title validation check here. It now strictly relies on JD evaluation.
+        is_match, match_score = evaluate_job(description)
         
         if is_match:
             qualified_jobs.append({
